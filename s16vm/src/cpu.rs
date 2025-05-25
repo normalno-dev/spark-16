@@ -8,7 +8,7 @@ pub enum StatusRegister {
 }
 
 pub struct S16VM {
-    pub registers: [u16; 16], // 16 general-purpose registers R0-R7
+    pub registers: [u16; 7],  // 7 general-purpose registers R0-R7
     pub pc: u16,              // Program Counter
     pub sp: u16,              // Stack Pointer
     pub sr: StatusRegister,   // Status register (Z, C, N, V)
@@ -16,3 +16,6 @@ pub struct S16VM {
     pub memory: [u8; 65536], // 64KB of memory
 }
 
+fn foo() {
+    let sr = StatusRegister::C;
+}

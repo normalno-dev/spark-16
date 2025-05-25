@@ -1,7 +1,7 @@
 mod register;
 mod word;
 
-use register::Register as R;
+use register::{Register as R, SpecialRegister as SR};
 use word::Word;
 
 pub enum Jump {
@@ -13,35 +13,33 @@ pub enum Jump {
 }
 
 pub enum Instruction {
-    Add { rd: u8, rs: u8, rt: u8 },
-    Sub { rd: u8, rs: u8, rt: u8 },
-    And { rd: u8, rs: u8, rt: u8 },
-    Or { rd: u8, rs: u8, rt: u8 },
-    Xor { rd: u8, rs: u8, rt: u8 },
-    Not { rd: u8, rt: u8 },
-    Sll { rd: u8, rs: u8, rt: u8 },
-    Shr { rd: u8, rs: u8, rt: u8 },
-    LoadIndirect { rd: u8, rs: u8 },
-    StoreIndirect { rd: u8, rs: u8 },
-    Cmp { rs: u8, rt: u8 },
+    Add { rd: R, rs: R, rt: R },
+    Sub { rd: R, rs: R, rt: R },
+    And { rd: R, rs: R, rt: R },
+    Or { rd: R, rs: R, rt: R },
+    Xor { rd: R, rs: R, rt: R },
+    Not { rd: R, rt: R },
+    Sll { rd: R, rs: R, rt: R },
+    Shr { rd: R, rs: R, rt: R },
+    LoadIndirect { rd: R, rs: R },
+    StoreIndirect { rd: R, rs: R },
+    Cmp { rs: R, rt: R },
     Return,
-    Push { rs: u8 },
-    Pop { rd: u8 },
+    Push { rs: R },
+    Pop { rd: R },
 
-    AddImmediate { rt: u8, imm: u8 },
-    AndImmediate { rt: u8, imm: u8 },
-    OrImmediate { rt: u8, imm: u8 },
-    LoadUperImmediate { rt: u8, imm: u8 },
-    CmpImmediate { rt: u8, imm: u8 },
-    Load { rt: u8, addr: u8 },
-    Store { rt: u8, addr: u8 },
+    AddImmediate { rt: R, imm: u8 },
+    AndImmediate { rt: R, imm: u8 },
+    OrImmediate { rt: R, imm: u8 },
+    LoadUperImmediate { rt: R, imm: u8 },
+    CmpImmediate { rt: R, imm: u8 },
+    Load { rt: R, addr: u8 },
+    Store { rt: R, addr: u8 },
 
     Jump { jump_type: Jump, offset: i16 },
 
-    // Rmovs: RT = Spec
-    RMovs { rt: u8, spec: u8 },
-    // WMovs: Spec = RT
-    WMovs { rt: u8, spec: u8 },
+    MoveFromSpecialToReg { rt: R, spec: SR },
+    MoveFromRegToSpecial { rt: R, spec: SR },
 
     // System operations
     Nop,
@@ -54,22 +52,6 @@ pub enum Instruction {
 
 impl Instruction {
     pub fn decode(w: Word) -> Result<Instruction, String> {
-        fn validate_reg(reg: u8) -> Result<(), String> {
-            if reg > 0x7 {
-                Err(format!("register must be 0..=7"))
-            } else {
-                Ok(())
-            }
-        }
-
-        fn validate_spec(spec: u8) -> Result<(), String> {
-            if spec > 0x3 {
-                Err(format!("SPEC must be 0..=7"))
-            } else {
-                Ok(())
-            }
-        }
-
         let instrruction = match w {
             Word::RType {
                 opcode,
@@ -78,9 +60,9 @@ impl Instruction {
                 rt,
                 funct,
             } => {
-                validate_reg(rd)?;
-                validate_reg(rs)?;
-                validate_reg(rt)?;
+                let rd = R::new(rd)?;
+                let rs = R::new(rs)?;
+                let rt = R::new(rt)?;
 
                 match (opcode, funct) {
                     (0x0, 0x0) => Instruction::Add { rd, rs, rt },
@@ -107,7 +89,7 @@ impl Instruction {
             }
 
             Word::IType { opcode, rt, imm } => {
-                validate_reg(rt)?;
+                let rt = R::new(rt)?;
 
                 match opcode {
                     0x0 => Instruction::Load { rt, addr: imm },
@@ -152,15 +134,16 @@ impl Instruction {
                 0x0 => Instruction::Nop,
                 0xE => Instruction::Sysall,
                 0xF => Instruction::Halt,
-                0x1 => {
-                    validate_reg(rs)?;
-                    validate_spec(rt)?;
-                    Instruction::RMovs { rt: rs, spec: rt }
+                
+                0x1 => { // MOVS Rt, SPEC ; instruction is [0xF][SUB][Rs][Rt][0]
+                    let spec = SR::new(rt)?;
+                    let rt = R::new(rs)?;
+                    Instruction::MoveFromSpecialToReg { rt, spec }
                 }
-                0x2 => {
-                    validate_reg(rt)?;
-                    validate_spec(rs)?;
-                    Instruction::WMovs { rt, spec: rs }
+                0x2 => { // MOVS SPEC, Rt ; instruction is [0xF][SUB][Rs][Rt][0]
+                    let rt = R::new(rt)?;
+                    let spec = SR::new(rs)?;
+                    Instruction::MoveFromRegToSpecial { rt, spec }
                 }
                 _ => return Err(format!("invalid E-type instruction: SUB=0x{:X}", subcode)),
             },
