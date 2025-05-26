@@ -1,13 +1,9 @@
-use std::fmt::write;
-
-use super::{instructions::{self, error::InstructionError, register::{Register, SpecialRegister}}, memory::MemoryError};
+use super::{instructions::{self, error::InstructionError, register::{Register}}, memory::MemoryError};
 use instructions::word::Word;
 
 #[derive(Debug)]
 pub enum CpuError {
     InvalidInstruction(Word, InstructionError),
-    InvalidRegister(Register),
-    InvalidSpecialRegister(SpecialRegister),
     MemoryOutOfBounds(MemoryError),
     ProgramBoundsViolation{pc:u16, iend: u16, low: u16, high: u16},
     StackOverflow,
@@ -21,8 +17,6 @@ impl std::fmt::Display for CpuError {
             CpuError::MemoryOutOfBounds(MemoryError::OutOfBounds(addr)) => write!(f, "memory out of bounds addr=0x{:X}", addr),
             CpuError::StackOverflow => write!(f, "stack overflow"),
             CpuError::NotImplementedYet => write!(f, "instruction is not implemented yet"),
-            CpuError::InvalidRegister(reg) => write!(f, "invalid register {}", reg.idx()),
-            CpuError::InvalidSpecialRegister(reg) => write!(f, "invalid special register {}", reg.idx()),
             CpuError::ProgramBoundsViolation { pc, iend, low, high } => 
                 write!(f, "PC violation: 0x{:04X} (instruction ends at {:04X}) outside program boundaries [{:04X}, {:04X}]", pc, iend, low, high),
         }

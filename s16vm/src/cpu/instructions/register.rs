@@ -12,11 +12,19 @@ pub enum Register {
     R5 = 5,
     R6 = 6,
     R7 = 7,
+
+    // Special Registers
+    SP,
+    PC,
+    FLAGS
 }
 
 impl Register {
     pub fn idx(self) -> u8 {
-        self as u8
+        match self {
+            Self::SP | Self::PC | Self::FLAGS => 0xF as u8,
+            _ => self as u8,
+        }
     }
 
     pub fn new(id: u8) -> Result<Self> {
@@ -41,31 +49,5 @@ impl Register {
 impl Into<u8> for Register {
     fn into(self) -> u8 {
         self.idx()
-    }
-}
-
-#[derive(Debug,Clone, Copy)]
-pub enum SpecialRegister {
-    PC = 0,
-    SP = 1,
-    FLAGS = 2,
-}
-
-impl SpecialRegister {
-    pub fn idx(self) -> u8 {
-        self as u8
-    }
-
-    pub fn new(id: u8) -> Result<Self> {
-        use SpecialRegister::*;
-
-        let reg = match id {
-            0 => PC,
-            1 => SP,
-            2 => FLAGS,
-            _ => return Err(InstructionError::InvalidSpecialRegister(id)),
-        };
-
-        Ok(reg)
     }
 }

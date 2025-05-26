@@ -2,7 +2,7 @@ pub mod register;
 pub mod word;
 pub mod error;
 
-use register::{Register as R, SpecialRegister as SR};
+use register::{Register as R};
 use error::InstructionError;
 use word::Word;
 
@@ -30,18 +30,18 @@ pub enum Instruction {
     Push { rs: R },
     Pop { rd: R },
 
-    AddImmediate { rt: R, imm: u8 },
-    AndImmediate { rt: R, imm: u8 },
-    OrImmediate { rt: R, imm: u8 },
-    LoadUperImmediate { rt: R, imm: u8 },
-    CmpImmediate { rt: R, imm: u8 },
-    Load { rt: R, addr: u8 },
-    Store { rt: R, addr: u8 },
+    AddImmediate { rt: R, imm: u16 },
+    AndImmediate { rt: R, imm: u16 },
+    OrImmediate { rt: R, imm: u16 },
+    LoadUperImmediate { rt: R, imm: u16 },
+    CmpImmediate { rt: R, imm: u16 },
+    Load { rt: R, addr: u16 },
+    Store { rt: R, addr: u16 },
 
-    Jump { jump_type: Jump, offset: i16 },
+    Jump { jump_type: Jump, offset: u16 },
 
-    MoveFromSpecialToReg { rt: R, spec: SR },
-    MoveFromRegToSpecial { rt: R, spec: SR },
+    MoveFromSpecialToReg { rt: R, spec: R },
+    MoveFromRegToSpecial { rt: R, spec: R },
 
     // System operations
     Nop,
@@ -120,13 +120,23 @@ impl Instruction {
                 0xF => Instruction::Halt,
                 
                 0x1 => { // MOVS Rt, SPEC ; instruction is [0xF][SUB][Rs][Rt][0]
-                    let spec = SR::new(rt)?;
+                    let spec = match rt {
+                        0 => R::PC,
+                        1 => R::SP,
+                        2 => R::FLAGS,
+                        _ => return Err(InstructionError::InvalidSpecialRegister(rt))
+                    };
                     let rt = R::new(rs)?;
                     Instruction::MoveFromSpecialToReg { rt, spec }
                 }
                 0x2 => { // MOVS SPEC, Rt ; instruction is [0xF][SUB][Rs][Rt][0]
                     let rt = R::new(rt)?;
-                    let spec = SR::new(rs)?;
+                    let spec = match rs {
+                        0 => R::PC,
+                        1 => R::SP,
+                        2 => R::FLAGS,
+                        _ => return Err(InstructionError::InvalidSpecialRegister(rs))
+                    };
                     Instruction::MoveFromRegToSpecial { rt, spec }
                 }
                 _ => return Err(InstructionError::InvalidEType(subcode)),

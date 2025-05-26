@@ -8,7 +8,7 @@ pub enum MemoryError {
 type Result<T> = std::result::Result<T, MemoryError>;
 
 pub struct Memory {
-    data: [u8; 0x10000], // 64KB
+    data: [u8; 0x10000], // 64KB, [0x0000,0xFFFF]
 }
 
 impl Default for Memory {
@@ -32,6 +32,22 @@ impl Memory {
         return Ok(word)
     }
 
+    pub fn write_word(&mut self, address: u16, value: u16) -> Result<()> {
+        let addr = address as usize;
+
+        if addr >= 0x10000 - 1 {
+            return Err(MemoryError::OutOfBounds(address))
+        }
+
+        // Little-endian: LSB at lower address
+        let low = (value & 0x00FF) as u8;
+        let high = (value >> 8) as u8;
+        self.data[addr] = low;
+        self.data[addr+1] = high;
+
+        Ok(())
+    }
+
     pub fn write_byte(&mut self, address: u16, byte: u8) -> Result<()> {
         let addr = address as usize;
 
@@ -47,6 +63,64 @@ impl Memory {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn test_write_word() {
+        // Test writing LSB and MSB bytes
+        {
+            let mut mem = Memory::default();
+            mem.write_word(0xA, 0xABCD).unwrap();
+
+            assert_eq!(mem.data[0xA], 0xCD); // LSB at lower address
+            assert_eq!(mem.data[0xB], 0xAB); // MSB
+        }
+
+        // Test writing zero at zero
+        {
+            let mut mem = Memory::default();
+            mem.write_word(0x0, 0x0).unwrap();
+            
+            assert_eq!(mem.data[0x0], 0x0);
+            assert_eq!(mem.data[0x1], 0x0);
+        }
+
+        // Test writing at maximal address
+        {
+            let mut mem = Memory::default();
+            mem.write_word(0xFFFE, 0xABCD).unwrap();
+
+            assert_eq!(mem.data[0xFFFE], 0xCD); // LSB at lower address
+            assert_eq!(mem.data[0xFFFF], 0xAB); // MSB
+        }
+
+        // Test writing one byte value
+        {
+            let mut memory = Memory::default();
+
+            // Test writing when MSB is zero
+            memory.write_word(0x50, 0x42).unwrap();
+            assert_eq!(memory.data[0x50], 0x42);
+            assert_eq!(memory.data[0x51], 0x0);
+            
+            // Test writing when LSB is zero
+            memory.write_word(0x50, 0x4200).unwrap();
+            assert_eq!(memory.data[0x50], 0x0);
+            assert_eq!(memory.data[0x51], 0x42);
+        }
+
+        // Test writing out of bounds
+        {
+            let mut mem = Memory::default();
+            let result = mem.write_word(0xFFFF, 0xABCD);
+            assert!(result.is_err());
+
+            if let Err(MemoryError::OutOfBounds(addr)) = result {
+                assert_eq!(addr, 0xFFFF);
+            } else {
+                panic!("Expected OutOfBounds error");
+            }
+        }
+    }
 
     #[test]
     fn test_read_word() {

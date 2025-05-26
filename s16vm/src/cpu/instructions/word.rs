@@ -10,7 +10,7 @@ const RD_MASK: u16        = 0b0000111000000000;
 const RS_MASK: u16        = 0b0000000111000000;
 const RT_MASK: u16        = 0b0000000000111000;
 const FUNCT_MASK: u16     = 0b0000000000000111;
-const IMMEDIATE_MASK: u16 = 0b0000000111111111;
+const IMMEDIATE_MASK: u16 = 0b0000_0001_1111_1111;
 const OFFSET_MASK: u16    = 0b0000111111111111;
 
 // A single word can code 4 different insturction types:
@@ -40,8 +40,8 @@ const OFFSET_MASK: u16    = 0b0000111111111111;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Word {
     RType { opcode: u8, rd: u8, rs: u8, rt: u8, funct: u8 },
-    IType { opcode: u8, rt: u8, imm: u8 },
-    JType { opcode: u8, offset: i16 },
+    IType { opcode: u8, rt: u8, imm: u16 },
+    JType { opcode: u8, offset: u16 },
     EType { subcode: u8, rs: u8, rt: u8 },
 }
 
@@ -67,11 +67,11 @@ impl Word {
             0x2..=0x8 => Self::IType {
                 opcode,
                 rt: ((bits & RD_MASK) >> RD_SHIFT) as u8,
-                imm: (bits & IMMEDIATE_MASK) as u8,
+                imm: (bits & IMMEDIATE_MASK) as u16,
             },
             0x9..=0xD => Self::JType {
                 opcode,
-                offset: (bits & OFFSET_MASK) as i16,
+                offset: (bits & OFFSET_MASK) as u16,
             },
             0xF => Self::EType {
                 subcode: ((bits & RD_MASK) >> RD_SHIFT) as u8,
@@ -98,14 +98,14 @@ impl Word {
         }
     }
 
-    pub fn immediate(self) -> Option<u8> {
+    pub fn immediate(self) -> Option<u16> {
         match self {
             Self::IType { imm: immediate, .. } => Some(immediate),
             _ => None,
         }
     }
 
-    pub fn offset(self) -> Option<i16> {
+    pub fn offset(self) -> Option<u16> {
         match self {
             Self::JType { offset, .. } => Some(offset),
             _ => None,

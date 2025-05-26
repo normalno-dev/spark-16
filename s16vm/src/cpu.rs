@@ -3,11 +3,12 @@ mod error;
 mod memory;
 
 use error::CpuError;
-use instructions::{register::Register, word::Word, Instruction};
+use instructions::{register::Register, word::Word, Instruction, Jump};
 use memory::Memory;
 
 type Result<T> = std::result::Result<T, CpuError>;
 
+#[derive(Default)]
 struct Flags {
     zero: bool,
     negative: bool,
@@ -16,21 +17,28 @@ struct Flags {
 }
 
 impl Flags {
-    fn as_u16(self) -> u16 {
+    fn as_u16(&self) -> u16 {
         (self.zero as u16)     << 0 |
         (self.carry as u16)    << 1 |
         (self.negative as u16) << 2 |
         (self.overflow as u16) << 3
     }
+
+    fn from_u16(&mut self, value: u16) {
+        self.zero     = (value & 0x01) != 0;
+        self.carry    = (value & 0x02) != 0;
+        self.negative = (value & 0x04) != 0;
+        self.overflow = (value & 0x08) != 0;
+    }
 }
 
-pub struct S16VM {
+pub struct CPU {
     registers: [u16; 8], // 8 general-purpose registers R0-R7
     pc: u16,             // Program Counter
     sp: u16,             // Stack Pointer
     flags: Flags,        // CPU Flags (Z, C, N, V)
 
-    memory: Memory, // 64KB of memory
+    memory: Memory,
     
     halted: bool,
 
@@ -39,7 +47,7 @@ pub struct S16VM {
     program_end: u16,
 }
 
-impl S16VM {
+impl CPU {
     pub fn execute(&mut self, instruction: Instruction) -> Result<()> {
         match instruction {
             Instruction::Add { rd, rs, rt } => self.op_add(rd,rs,rt),
@@ -53,13 +61,13 @@ impl S16VM {
             Instruction::Sll { rd, rs, rt } => self.op_shift(rd, rs, rt, ShiftOperation::Left),
             Instruction::Shr { rd, rs, rt } => self.op_shift(rd, rs, rt, ShiftOperation::Right),
 
-            Instruction::LoadIndirect { rd, rs } => Err(CpuError::NotImplementedYet),
-            Instruction::StoreIndirect { rd, rs } => Err(CpuError::NotImplementedYet),
+            Instruction::LoadIndirect { rd, rs } => self.op_load_indirect(rd, rs),
+            Instruction::StoreIndirect { rd, rs } => self.op_store_indirect(rd, rs),
 
-            Instruction::Cmp { rs, rt } => Err(CpuError::NotImplementedYet),
-            Instruction::Return => Err(CpuError::NotImplementedYet),
-            Instruction::Push { rs } => Err(CpuError::NotImplementedYet),
-            Instruction::Pop { rd } => Err(CpuError::NotImplementedYet),
+            Instruction::Cmp { rs, rt } => self.op_cmp(rs, rt),
+            Instruction::Return => self.op_ret(),
+            Instruction::Push { rs } => self.op_push(rs),
+            Instruction::Pop { rd } => self.op_pop(rd),
             Instruction::AddImmediate { rt, imm } => Err(CpuError::NotImplementedYet),
             Instruction::AndImmediate { rt, imm } => Err(CpuError::NotImplementedYet),
             Instruction::OrImmediate { rt, imm } => Err(CpuError::NotImplementedYet),
@@ -67,11 +75,11 @@ impl S16VM {
             Instruction::CmpImmediate { rt, imm } => Err(CpuError::NotImplementedYet),
             Instruction::Load { rt, addr } => Err(CpuError::NotImplementedYet),
             Instruction::Store { rt, addr } => Err(CpuError::NotImplementedYet),
-            Instruction::Jump { jump_type, offset } => Err(CpuError::NotImplementedYet),
+            Instruction::Jump { jump_type, offset } => self.op_jump(jump_type, offset),
             Instruction::MoveFromSpecialToReg { rt, spec } => Err(CpuError::NotImplementedYet),
             Instruction::MoveFromRegToSpecial { rt, spec } => Err(CpuError::NotImplementedYet),
             Instruction::Nop => Ok(()),
-            Instruction::Halt => Err(CpuError::NotImplementedYet),
+            Instruction::Halt => self.op_halt(),
             Instruction::Sysall => Err(CpuError::NotImplementedYet),
             Instruction::ERR(_) => Err(CpuError::NotImplementedYet),
         }
@@ -110,9 +118,11 @@ impl S16VM {
         self.program_start = start_addr;
         self.program_end = start_addr + program_size;
         self.pc = start_addr;
+        self.sp = 0xFFFE;
 
         for (i, &byte) in program.iter().enumerate() {
-            self.memory.write_byte(i as u16, byte)?;
+            let addr = start_addr + i as u16;
+            self.memory.write_byte(addr, byte)?;
         }
 
         Ok(())
@@ -124,8 +134,8 @@ impl S16VM {
         Ok(())
     }
 
-    // Control program boundries. The simples way to not get fuck up.
-    // Later, it should bne upgraded to hybryd system based on memory segments and CPU security polices.
+    // Control program boundries, it's the simplest way to not fuck up.
+    // Later, it should be upgraded to hybrid system based on memory segments and CPU security polices.
     fn secure_boundaries(&self) -> Result<()> {
         // Check if we can read full instruction and not became out of program boundaries.
         let instruction_end = self.pc.saturating_add(2);
@@ -136,21 +146,26 @@ impl S16VM {
         }
     }
 
-    fn get_register(&self, reg: Register) -> Result<u16> {
-        match reg.idx() {
-            0..=7 => Ok(self.registers[reg as usize]),
-            _ => Err(CpuError::InvalidRegister(reg)),
+    fn get_register(&self, reg: Register) -> u16 {
+        use Register::*;
+        match reg {
+            R0 => 0,
+            R1 | R2 | R3 | R4 | R5 | R6 | R7 => self.registers[reg as usize],
+            SP => self.sp,
+            PC => self.pc,
+            FLAGS => self.flags.as_u16(),
         }
     }
 
-    fn set_register(&mut self, reg: Register, val: u16) -> Result<()> {
-        match reg.idx() {
-            0 => Ok(()), // can't be changed
-            1..=7 => {
-                self.registers[reg as usize] = val;
-                Ok(())
-            },
-            _ => Err(CpuError::InvalidRegister(reg)),
+    fn set_register(&mut self, reg: Register, val: u16) {
+        use Register::*;
+
+        match reg {
+            R0 => return, // R0 can't be changed
+            R1 | R2 | R3 | R4 | R5 | R6 | R7 => self.registers[reg as usize] = val,
+            SP => self.sp = val,
+            PC => self.pc = val,
+            FLAGS => self.flags.from_u16(val),
         }
     }
 
@@ -205,32 +220,32 @@ enum ShiftOperation {
     Left, Right
 }
 
-impl S16VM {
+impl CPU {
     fn op_add(&mut self, rd: Register, rs: Register, rt: Register) -> Result<()> {
-        let a = self.get_register(rs)?;
-        let b = self.get_register(rt)?;
+        let a = self.get_register(rs);
+        let b = self.get_register(rt);
         let (result, carry) = a.overflowing_add(b);
 
-        self.set_register(rd, result)?;
+        self.set_register(rd, result);
         self.update_flags_arithmetic(a, b, result, carry, false);
 
         Ok(())
     }
 
     fn op_sub(&mut self, rd: Register, rs: Register, rt: Register) -> Result<()> {
-        let a = self.get_register(rs)?;
-        let b = self.get_register(rt)?;
+        let a = self.get_register(rs);
+        let b = self.get_register(rt);
         let (result, borrow) = a.overflowing_sub(b);
 
-        self.set_register(rd, result)?;
+        self.set_register(rd, result);
         self.update_flags_arithmetic(a, b, result, borrow, true);
 
         Ok(())
     }
 
     fn op_logical(&mut self, rd: Register, rs: Register, rt: Register, op: LogicalOperation) -> Result<()> {
-        let a = self.get_register(rs)?;
-        let b = self.get_register(rt)?;
+        let a = self.get_register(rs);
+        let b = self.get_register(rt);
         let result = match op {
             LogicalOperation::And => a & b,
             LogicalOperation::Or  => a | b,
@@ -238,18 +253,18 @@ impl S16VM {
             LogicalOperation::Not => !a,
         };
 
-        self.set_register(rd, result)?;
+        self.set_register(rd, result);
         self.update_flags_logical(result);
 
         Ok(())
     }
 
     fn op_shift(&mut self, rd: Register, rs:Register, rt: Register, op: ShiftOperation) -> Result<()> {
-        let value = self.get_register(rs)?;
-        let s_size = self.get_register(rt)? & 0xF; // Mask to 4 bits (0-15 range)
+        let value = self.get_register(rs);
+        let s_size = self.get_register(rt) & 0xF; // Mask to 4 bits (0-15 range)
 
         if s_size == 0 {
-            self.set_register(rd, value)?;
+            self.set_register(rd, value);
             return Ok(());
         }
 
@@ -268,9 +283,116 @@ impl S16VM {
             }
         };
 
-        self.set_register(rd, result)?;
+        self.set_register(rd, result);
         self.update_flags_shift(result, last_shifted_bit);
 
         Ok(())
+    }
+
+    fn op_halt(&mut self) -> Result<()> {
+        self.halted = true;
+        Ok(())
+    }
+
+    fn op_load_indirect(&mut self, rd: Register, rs: Register) -> Result<()> {
+        let value = self.memory.read_word(rs as u16)?;
+        self.set_register(rd, value);
+        Ok(())
+    }
+
+    fn op_store_indirect(&mut self, rd: Register, rs: Register) -> Result<()> {
+        let value = self.get_register(rd);
+        self.memory.write_word(rs as u16, value)?;
+        Ok(())
+    }
+
+    fn op_cmp(&mut self, rs: Register, rt: Register) -> Result<()> {
+        let operand_a = self.get_register(rs);
+        let operand_b = self.get_register(rt);
+        let (result, borrow) = operand_a.overflowing_sub(operand_b);
+
+        self.update_flags_arithmetic(operand_a, operand_b, result, borrow, true);
+
+        Ok(())
+    }
+
+    fn op_push(&mut self, rs: Register) -> Result<()> {
+        let value = self.get_register(rs);
+        if self.sp < 2 {
+            return Err(CpuError::StackOverflow)
+        }
+
+        self.sp = self.sp.wrapping_sub(2);
+        self.memory.write_word(self.sp, value)?;
+
+        Ok(())
+    }
+
+    fn op_pop(&mut self, rd: Register) -> Result<()> {
+        if self.sp > 0xFFFE {
+            return Err(CpuError::StackOverflow)
+        }
+
+        let value = self.memory.read_word(self.sp)?;
+        self.set_register(rd, value);
+        self.sp = self.sp.wrapping_add(2);
+
+        Ok(())
+    }
+
+    fn op_ret(&mut self) -> Result<()> {
+        self.op_pop(Register::PC)?;
+
+        Ok(())
+    }
+
+    // Remember offset is 12 bits!
+    fn op_jump(&mut self, jt: Jump, offset: u16) -> Result<()> {
+        let signed_offset = convert_12bit_to_signed(offset);
+
+        match jt {
+            Jump::Call => {
+                self.op_push(Register::PC)?;
+                self.set_register(Register::PC, self.pc.wrapping_add_signed(signed_offset));
+            },
+            Jump::Unconditional => {
+                self.set_register(Register::PC, self.pc.wrapping_add_signed(signed_offset));
+            },
+            Jump::Zero => {
+                if self.flags.zero {
+                    self.set_register(Register::PC, self.pc.wrapping_add_signed(signed_offset));
+                }
+            },
+            Jump::NotZero => {
+                if !self.flags.zero {
+                    self.set_register(Register::PC, self.pc.wrapping_add_signed(signed_offset));
+                }
+            },
+            Jump::GreaterThan => {
+                if !self.flags.zero && self.flags.negative == self.flags.overflow {
+                    self.set_register(Register::PC, self.pc.wrapping_add_signed(signed_offset));
+                }
+            },
+        }
+
+        Ok(())
+    }
+}
+
+fn convert_12bit_to_signed(offset: u16) -> i16 {
+    let offset = offset & 0x0FFF;
+
+    if offset & 0x0800 != 0 { // negative
+        (offset | 0xF000) as i16
+    } else {
+        offset as i16
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn test_u16_as_i12() {
+        let v: u16 = 0b0000_1000_0000_000;
     }
 }

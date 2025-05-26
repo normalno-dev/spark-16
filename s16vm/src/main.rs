@@ -1,6 +1,6 @@
 mod cpu;
 
-use cpu::S16VM;
+use cpu::CPU;
 
 fn main() {
     println!("Hello, world!");
