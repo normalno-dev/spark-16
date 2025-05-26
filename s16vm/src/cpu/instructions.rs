@@ -1,7 +1,9 @@
-mod register;
-mod word;
+pub mod register;
+pub mod word;
+pub mod error;
 
 use register::{Register as R, SpecialRegister as SR};
+use error::InstructionError;
 use word::Word;
 
 pub enum Jump {
@@ -50,8 +52,10 @@ pub enum Instruction {
     ERR(String),
 }
 
+type Result<T> = std::result::Result<T, InstructionError>;
+
 impl Instruction {
-    pub fn decode(w: Word) -> Result<Instruction, String> {
+    pub fn decode(w: Word) -> Result<Instruction> {
         let instrruction = match w {
             Word::RType {
                 opcode,
@@ -79,12 +83,7 @@ impl Instruction {
                     (0x1, 0x3) => Instruction::Return,
                     (0x1, 0x4) => Instruction::Push { rs },
                     (0x1, 0x5) => Instruction::Pop { rd },
-                    _ => {
-                        return Err(format!(
-                            "invalid R-type instruction: OP=0x{:X} FUNCT=0x{:X}",
-                            opcode, funct
-                        ))
-                    }
+                    _ => return Err(InstructionError::InvalidRType(opcode, funct))
                 }
             }
 
@@ -99,34 +98,19 @@ impl Instruction {
                     0x4 => Instruction::OrImmediate { rt, imm },
                     0x5 => Instruction::LoadUperImmediate { rt, imm },
                     0x6 => Instruction::CmpImmediate { rt, imm },
-                    _ => return Err(format!("invalid I-type instruction: OP=0x{:X}", opcode)),
+                    _ => return Err(InstructionError::InvalidIType(opcode)),
                 }
             }
 
             Word::JType { opcode, offset } => {
                 use Jump::*;
                 match opcode {
-                    0x7 => Instruction::Jump {
-                        jump_type: Call,
-                        offset,
-                    },
-                    0x8 => Instruction::Jump {
-                        jump_type: Unconditional,
-                        offset,
-                    },
-                    0x9 => Instruction::Jump {
-                        jump_type: Zero,
-                        offset,
-                    },
-                    0xA => Instruction::Jump {
-                        jump_type: NotZero,
-                        offset,
-                    },
-                    0xB => Instruction::Jump {
-                        jump_type: GreaterThan,
-                        offset,
-                    },
-                    _ => return Err(format!("invalid J-type instruction: OP=0x{:X}", opcode)),
+                    0x7 => Instruction::Jump {jump_type: Call, offset},
+                    0x8 => Instruction::Jump {jump_type: Unconditional, offset},
+                    0x9 => Instruction::Jump {jump_type: Zero, offset},
+                    0xA => Instruction::Jump {jump_type: NotZero, offset},
+                    0xB => Instruction::Jump {jump_type: GreaterThan, offset},
+                    _ => return Err(InstructionError::InvalidJType(opcode)),
                 }
             }
 
@@ -145,7 +129,7 @@ impl Instruction {
                     let spec = SR::new(rs)?;
                     Instruction::MoveFromRegToSpecial { rt, spec }
                 }
-                _ => return Err(format!("invalid E-type instruction: SUB=0x{:X}", subcode)),
+                _ => return Err(InstructionError::InvalidEType(subcode)),
             },
         };
 

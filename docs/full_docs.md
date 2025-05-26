@@ -94,23 +94,23 @@ OPCODE      | OFFSET (12-bit signed)
 
 | Mnemonic       | Opcode | Description                          |
 | -------------- | ------ | ------------------------------------ |
-| LOAD Rt, addr  | 0x0    | Rt = Memory[addr]                    |
-| STORE Rt, addr | 0x1    | Memory[addr] = Rt                    |
-| ADDI Rt, imm   | 0x2    | Rt = Rt + imm                        |
-| ANDI Rt, imm   | 0x3    | Rt = Rt & imm                        |
-| ORI Rt, imm    | 0x4    | Rt = Rt \| imm                       |
-| LUI Rt, imm    | 0x5    | Rt = imm << 8 (load upper immediate) |
-| CMPI Rt, imm   | 0x6    | Compare Rt and imm, set flags        |
+| LOAD Rt, addr  | 0x2    | Rt = Memory[addr]                    |
+| STORE Rt, addr | 0x3    | Memory[addr] = Rt                    |
+| ADDI Rt, imm   | 0x4    | Rt = Rt + imm                        |
+| ANDI Rt, imm   | 0x5    | Rt = Rt & imm                        |
+| ORI Rt, imm    | 0x6    | Rt = Rt \| imm                       |
+| LUI Rt, imm    | 0x7    | Rt = imm << 8 (load upper immediate) |
+| CMPI Rt, imm   | 0x8    | Compare Rt and imm, set flags        |
 
 ### J-Type Instructions
 
 | Mnemonic    | Opcode | Description                         |
 | ----------- | ------ | ----------------------------------- |
-| CALL offset | 0x7    | Memory[--SP] = PC; PC = PC + offset |
-| JMP offset  | 0x8    | PC = PC + offset                    |
-| JZ offset   | 0x9    | if (Z flag) PC = PC + offset        |
-| JNZ offset  | 0xA    | if (!Z flag) PC = PC + offset       |
-| JGT offset  | 0xB    | if (!Z && N==V) PC = PC + offset    |
+| CALL offset | 0x9    | Memory[--SP] = PC; PC = PC + offset |
+| JMP offset  | 0xA    | PC = PC + offset                    |
+| JZ offset   | 0xB    | if (Z flag) PC = PC + offset        |
+| JNZ offset  | 0xC    | if (!Z flag) PC = PC + offset       |
+| JGT offset  | 0xD    | if (!Z && N==V) PC = PC + offset    |
 
 ### E-Type Instructions
 
