@@ -1,8 +1,10 @@
 mod instructions;
 mod error;
+mod memory;
 
 use error::CpuError;
-use instructions::{register::Register, Instruction};
+use instructions::{register::Register, word::Word, Instruction};
+use memory::Memory;
 
 type Result<T> = std::result::Result<T, CpuError>;
 
@@ -22,17 +24,15 @@ impl Flags {
     }
 }
 
-struct Memory {
-    data: [u8; 0x10000], // 64KB
-}
-
 pub struct S16VM {
-    pub registers: [u16; 8], // 8 general-purpose registers R0-R7
-    pub pc: u16,             // Program Counter
-    pub sp: u16,             // Stack Pointer
-    pub flags: Flags,        // CPU Flags (Z, C, N, V)
+    registers: [u16; 8], // 8 general-purpose registers R0-R7
+    pc: u16,             // Program Counter
+    sp: u16,             // Stack Pointer
+    flags: Flags,        // CPU Flags (Z, C, N, V)
 
-    pub memory: [u8; 65536], // 64KB of memory
+    memory: Memory, // 64KB of memory
+    
+    halted: bool,
 }
 
 impl S16VM {
@@ -71,6 +71,21 @@ impl S16VM {
             Instruction::Sysall => Err(CpuError::NotImplementedYet),
             Instruction::ERR(_) => Err(CpuError::NotImplementedYet),
         }
+    }
+
+    pub fn step(&mut self) -> Result<bool> {
+        if self.halted {
+            return Ok(false)
+        }
+
+        let instruction_word = self.memory.read_word(self.pc)?;
+        let word = Word::new(instruction_word);
+
+        Ok(true)
+    }
+
+    pub fn load() {
+        
     }
 
     fn get_register(&self, reg: Register) -> Result<u16> {
