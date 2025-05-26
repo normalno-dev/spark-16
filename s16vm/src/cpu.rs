@@ -33,6 +33,10 @@ pub struct S16VM {
     memory: Memory, // 64KB of memory
     
     halted: bool,
+
+    // used to control program bounderies
+    program_start: u16,
+    program_end: u16,
 }
 
 impl S16VM {
@@ -78,14 +82,58 @@ impl S16VM {
             return Ok(false)
         }
 
+        // Security control
+        self.secure_boundaries()?;
+
+        // Fetch
         let instruction_word = self.memory.read_word(self.pc)?;
+        self.pc = self.pc.wrapping_add(2);
+
+        // Decode
         let word = Word::new(instruction_word);
+        let instruction = match Instruction::decode(word) {
+            Ok(x) => x,
+            Err(err) => return Err(CpuError::InvalidInstruction(word, err)),
+        };
+
+        // Exec
+        self.execute(instruction)?;
 
         Ok(true)
     }
 
-    pub fn load() {
-        
+    // Load a program into memory with starting address start_addr.
+    // Automatically sets program boundaries and pc.
+    pub fn load_program(&mut self, program: &[u8], start_addr: u16) -> Result<()> {
+        let program_size = program.len() as u16;
+
+        self.program_start = start_addr;
+        self.program_end = start_addr + program_size;
+        self.pc = start_addr;
+
+        for (i, &byte) in program.iter().enumerate() {
+            self.memory.write_byte(i as u16, byte)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn run(&mut self) -> Result<()> {
+        while self.step()? {};
+
+        Ok(())
+    }
+
+    // Control program boundries. The simples way to not get fuck up.
+    // Later, it should bne upgraded to hybryd system based on memory segments and CPU security polices.
+    fn secure_boundaries(&self) -> Result<()> {
+        // Check if we can read full instruction and not became out of program boundaries.
+        let instruction_end = self.pc.saturating_add(2);
+        if self.pc < self.program_start || instruction_end > self.program_end {
+            Err(CpuError::ProgramBoundsViolation { pc: self.pc, iend: instruction_end, low: self.program_start, high: self.program_end })
+        } else {
+            Ok(())
+        }
     }
 
     fn get_register(&self, reg: Register) -> Result<u16> {

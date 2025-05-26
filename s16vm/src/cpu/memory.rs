@@ -5,6 +5,8 @@ pub enum MemoryError {
     OutOfBounds(u16)
 }
 
+type Result<T> = std::result::Result<T, MemoryError>;
+
 pub struct Memory {
     data: [u8; 0x10000], // 64KB
 }
@@ -16,7 +18,7 @@ impl Default for Memory {
 }
 
 impl Memory {
-    pub fn read_word(&self, address: u16) -> Result<u16, MemoryError> {
+    pub fn read_word(&self, address: u16) -> Result<u16> {
         let addr = address as usize;
 
         if addr >= 0x10000 - 1 {
@@ -28,6 +30,17 @@ impl Memory {
         let high = self.data[addr+1] as u16;
         let word = (high << 8) | low;
         return Ok(word)
+    }
+
+    pub fn write_byte(&mut self, address: u16, byte: u8) -> Result<()> {
+        let addr = address as usize;
+
+        if addr >= 0x10000 {
+            return Err(MemoryError::OutOfBounds(address))
+        }
+
+        self.data[addr] = byte;
+        Ok(())
     }
 }
 

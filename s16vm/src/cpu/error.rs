@@ -9,6 +9,7 @@ pub enum CpuError {
     InvalidRegister(Register),
     InvalidSpecialRegister(SpecialRegister),
     MemoryOutOfBounds(MemoryError),
+    ProgramBoundsViolation{pc:u16, iend: u16, low: u16, high: u16},
     StackOverflow,
     NotImplementedYet,
 }
@@ -22,6 +23,8 @@ impl std::fmt::Display for CpuError {
             CpuError::NotImplementedYet => write!(f, "instruction is not implemented yet"),
             CpuError::InvalidRegister(reg) => write!(f, "invalid register {}", reg.idx()),
             CpuError::InvalidSpecialRegister(reg) => write!(f, "invalid special register {}", reg.idx()),
+            CpuError::ProgramBoundsViolation { pc, iend, low, high } => 
+                write!(f, "PC violation: 0x{:04X} (instruction ends at {:04X}) outside program boundaries [{:04X}, {:04X}]", pc, iend, low, high),
         }
     }
 }
