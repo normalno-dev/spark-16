@@ -51,10 +51,10 @@ OPCODE      | RD       | RS       | RT       | FUNCT
 
 ### I-Type (Immediate Operations)
 ```
-15 14 13 12 | 11 10 09 | 08 07 06 05 04 03 02 01 00
-OPCODE      | RT       | IMMEDIATE (9-bit signed)
+15 14 13 12 | 11 10 09 | 08 | 07 06 05 04 03 02 01 00
+OPCODE      | RT       | 0  | IMMEDIATE
 ```
-- Immediate range: -256 to +255
+- Immediate range: -128 to +127
 
 ### J-Type (Jump Operations)
 ```

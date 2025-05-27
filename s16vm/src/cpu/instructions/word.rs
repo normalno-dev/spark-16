@@ -5,13 +5,13 @@ const RD_SHIFT: u8 = 9;
 const RS_SHIFT: u8 = 6;
 const RT_SHIFT: u8 = 3;
 
-const OPCODE_MASK: u16    = 0b1111000000000000;
-const RD_MASK: u16        = 0b0000111000000000;
-const RS_MASK: u16        = 0b0000000111000000;
-const RT_MASK: u16        = 0b0000000000111000;
-const FUNCT_MASK: u16     = 0b0000000000000111;
-const IMMEDIATE_MASK: u16 = 0b0000_0001_1111_1111;
-const OFFSET_MASK: u16    = 0b0000111111111111;
+const OPCODE_MASK: u16    = 0b1111_0000_0000_0000;
+const RD_MASK: u16        = 0b0000_1110_0000_0000;
+const RS_MASK: u16        = 0b0000_0001_1100_0000;
+const RT_MASK: u16        = 0b0000_0000_0011_1000;
+const FUNCT_MASK: u16     = 0b0000_0000_0000_0111;
+const IMMEDIATE_MASK: u16 = 0b0000_0000_1111_1111;
+const OFFSET_MASK: u16    = 0b0000_1111_1111_1111;
 
 // A single word can code 4 different insturction types:
 // **R-Type (Register-Register Operations)**
@@ -40,7 +40,7 @@ const OFFSET_MASK: u16    = 0b0000111111111111;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Word {
     RType { opcode: u8, rd: u8, rs: u8, rt: u8, funct: u8 },
-    IType { opcode: u8, rt: u8, imm: u16 },
+    IType { opcode: u8, rt: u8, imm: u8 },
     JType { opcode: u8, offset: u16 },
     EType { subcode: u8, rs: u8, rt: u8 },
 }
@@ -67,7 +67,7 @@ impl Word {
             0x2..=0x8 => Self::IType {
                 opcode,
                 rt: ((bits & RD_MASK) >> RD_SHIFT) as u8,
-                imm: (bits & IMMEDIATE_MASK) as u16,
+                imm: (bits & IMMEDIATE_MASK) as u8,
             },
             0x9..=0xD => Self::JType {
                 opcode,
@@ -98,7 +98,7 @@ impl Word {
         }
     }
 
-    pub fn immediate(self) -> Option<u16> {
+    pub fn immediate(self) -> Option<u8> {
         match self {
             Self::IType { imm: immediate, .. } => Some(immediate),
             _ => None,

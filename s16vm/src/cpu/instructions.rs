@@ -30,13 +30,13 @@ pub enum Instruction {
     Push { rs: R },
     Pop { rd: R },
 
-    AddImmediate { rt: R, imm: u16 },
-    AndImmediate { rt: R, imm: u16 },
-    OrImmediate { rt: R, imm: u16 },
-    LoadUperImmediate { rt: R, imm: u16 },
-    CmpImmediate { rt: R, imm: u16 },
-    Load { rt: R, addr: u16 },
-    Store { rt: R, addr: u16 },
+    AddImmediate { rt: R, imm: i8 },
+    AndImmediate { rt: R, imm: u8 },
+    OrImmediate { rt: R, imm: u8 },
+    LoadUperImmediate { rt: R, imm: u8 },
+    CmpImmediate { rt: R, imm: i8 },
+    Load { rt: R, addr: u8 },
+    Store { rt: R, addr: u8 },
 
     Jump { jump_type: Jump, offset: u16 },
 
@@ -93,11 +93,11 @@ impl Instruction {
                 match opcode {
                     0x0 => Instruction::Load { rt, addr: imm },
                     0x1 => Instruction::Store { rt, addr: imm },
-                    0x2 => Instruction::AddImmediate { rt, imm },
+                    0x2 => Instruction::AddImmediate { rt, imm: imm as i8 },
                     0x3 => Instruction::AndImmediate { rt, imm },
                     0x4 => Instruction::OrImmediate { rt, imm },
                     0x5 => Instruction::LoadUperImmediate { rt, imm },
-                    0x6 => Instruction::CmpImmediate { rt, imm },
+                    0x6 => Instruction::CmpImmediate { rt, imm: imm as i8 },
                     _ => return Err(InstructionError::InvalidIType(opcode)),
                 }
             }
