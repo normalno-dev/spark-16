@@ -2,7 +2,7 @@ use super::error::CpuError;
 
 #[derive(Debug)]
 pub enum MemoryError {
-    OutOfBounds(u16)
+    OutOfBounds(u16),
 }
 
 type Result<T> = std::result::Result<T, MemoryError>;
@@ -22,28 +22,28 @@ impl Memory {
         let addr = address as usize;
 
         if addr >= 0x10000 - 1 {
-            return Err(MemoryError::OutOfBounds(address))
+            return Err(MemoryError::OutOfBounds(address));
         }
 
         // Little-endian: LSB at lower address
         let low = self.data[addr] as u16;
-        let high = self.data[addr+1] as u16;
+        let high = self.data[addr + 1] as u16;
         let word = (high << 8) | low;
-        return Ok(word)
+        return Ok(word);
     }
 
     pub fn write_word(&mut self, address: u16, value: u16) -> Result<()> {
         let addr = address as usize;
 
         if addr >= 0x10000 - 1 {
-            return Err(MemoryError::OutOfBounds(address))
+            return Err(MemoryError::OutOfBounds(address));
         }
 
         // Little-endian: LSB at lower address
         let low = (value & 0x00FF) as u8;
         let high = (value >> 8) as u8;
         self.data[addr] = low;
-        self.data[addr+1] = high;
+        self.data[addr + 1] = high;
 
         Ok(())
     }
@@ -52,7 +52,7 @@ impl Memory {
         let addr = address as usize;
 
         if addr >= 0x10000 {
-            return Err(MemoryError::OutOfBounds(address))
+            return Err(MemoryError::OutOfBounds(address));
         }
 
         self.data[addr] = byte;
@@ -90,7 +90,7 @@ mod test {
         {
             let mut mem = Memory::default();
             mem.write_word(0x0, 0x0).unwrap();
-            
+
             assert_eq!(mem.data[0x0], 0x0);
             assert_eq!(mem.data[0x1], 0x0);
         }
@@ -112,7 +112,7 @@ mod test {
             memory.write_word(0x50, 0x42).unwrap();
             assert_eq!(memory.data[0x50], 0x42);
             assert_eq!(memory.data[0x51], 0x0);
-            
+
             // Test writing when LSB is zero
             memory.write_word(0x50, 0x4200).unwrap();
             assert_eq!(memory.data[0x50], 0x0);
@@ -170,7 +170,7 @@ mod test {
             memory.data[0x50] = 0x42; // LSB
             memory.data[0x51] = 0x00; // MSB = 0
             assert_eq!(memory.read_word(0x50).unwrap(), 0x0042);
-            
+
             // Test reading when LSB is zero
             memory.data[0x60] = 0x00; // LSB = 0
             memory.data[0x61] = 0x42; // MSB

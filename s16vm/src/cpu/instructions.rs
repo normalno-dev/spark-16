@@ -1,9 +1,9 @@
+pub mod error;
 pub mod register;
 pub mod word;
-pub mod error;
 
-use register::{Register as R};
 use error::InstructionError;
+use register::Register as R;
 use word::Word;
 
 pub enum Jump {
@@ -80,7 +80,7 @@ impl Instruction {
                     (0x1, 0x3) => Instruction::Return,
                     (0x1, 0x4) => Instruction::Push { rs },
                     (0x1, 0x5) => Instruction::Pop { rd },
-                    _ => return Err(InstructionError::InvalidRType(opcode, funct))
+                    _ => return Err(InstructionError::InvalidRType(opcode, funct)),
                 }
             }
 
@@ -102,11 +102,26 @@ impl Instruction {
             Word::JType { opcode, offset } => {
                 use Jump::*;
                 match opcode {
-                    0x7 => Instruction::Jump {jump_type: Call, offset},
-                    0x8 => Instruction::Jump {jump_type: Unconditional, offset},
-                    0x9 => Instruction::Jump {jump_type: Zero, offset},
-                    0xA => Instruction::Jump {jump_type: NotZero, offset},
-                    0xB => Instruction::Jump {jump_type: GreaterThan, offset},
+                    0x7 => Instruction::Jump {
+                        jump_type: Call,
+                        offset,
+                    },
+                    0x8 => Instruction::Jump {
+                        jump_type: Unconditional,
+                        offset,
+                    },
+                    0x9 => Instruction::Jump {
+                        jump_type: Zero,
+                        offset,
+                    },
+                    0xA => Instruction::Jump {
+                        jump_type: NotZero,
+                        offset,
+                    },
+                    0xB => Instruction::Jump {
+                        jump_type: GreaterThan,
+                        offset,
+                    },
                     _ => return Err(InstructionError::InvalidJType(opcode)),
                 }
             }
@@ -115,24 +130,26 @@ impl Instruction {
                 0x0 => Instruction::Nop,
                 0xE => Instruction::Sysall,
                 0xF => Instruction::Halt,
-                
-                0x1 => { // MOVS Rt, SPEC ; instruction is [0xF][SUB][Rs][Rt][0]
+
+                0x1 => {
+                    // MOVS Rt, SPEC ; instruction is [0xF][SUB][Rs][Rt][0]
                     let spec = match rt {
                         0 => R::PC,
                         1 => R::SP,
                         2 => R::FLAGS,
-                        _ => return Err(InstructionError::InvalidSpecialRegister(rt))
+                        _ => return Err(InstructionError::InvalidSpecialRegister(rt)),
                     };
                     let rt = R::new(rs)?;
                     Instruction::MoveFromSpecial { rt, spec }
                 }
-                0x2 => { // MOVS SPEC, Rt ; instruction is [0xF][SUB][Rs][Rt][0]
+                0x2 => {
+                    // MOVS SPEC, Rt ; instruction is [0xF][SUB][Rs][Rt][0]
                     let rt = R::new(rt)?;
                     let spec = match rs {
                         0 => R::PC,
                         1 => R::SP,
                         2 => R::FLAGS,
-                        _ => return Err(InstructionError::InvalidSpecialRegister(rs))
+                        _ => return Err(InstructionError::InvalidSpecialRegister(rs)),
                     };
                     Instruction::MoveFromToSpecial { rt, spec }
                 }

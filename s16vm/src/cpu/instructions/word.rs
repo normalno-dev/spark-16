@@ -5,13 +5,13 @@ const RD_SHIFT: u8 = 9;
 const RS_SHIFT: u8 = 6;
 const RT_SHIFT: u8 = 3;
 
-const OPCODE_MASK: u16    = 0b1111_0000_0000_0000;
-const RD_MASK: u16        = 0b0000_1110_0000_0000;
-const RS_MASK: u16        = 0b0000_0001_1100_0000;
-const RT_MASK: u16        = 0b0000_0000_0011_1000;
-const FUNCT_MASK: u16     = 0b0000_0000_0000_0111;
+const OPCODE_MASK: u16 = 0b1111_0000_0000_0000;
+const RD_MASK: u16 = 0b0000_1110_0000_0000;
+const RS_MASK: u16 = 0b0000_0001_1100_0000;
+const RT_MASK: u16 = 0b0000_0000_0011_1000;
+const FUNCT_MASK: u16 = 0b0000_0000_0000_0111;
 const IMMEDIATE_MASK: u16 = 0b0000_0000_1111_1111;
-const OFFSET_MASK: u16    = 0b0000_1111_1111_1111;
+const OFFSET_MASK: u16 = 0b0000_1111_1111_1111;
 
 // A single word can code 4 different insturction types:
 // **R-Type (Register-Register Operations)**
@@ -39,10 +39,27 @@ const OFFSET_MASK: u16    = 0b0000_1111_1111_1111;
 // ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Word {
-    RType { opcode: u8, rd: u8, rs: u8, rt: u8, funct: u8 },
-    IType { opcode: u8, rt: u8, imm: u8 },
-    JType { opcode: u8, offset: u16 },
-    EType { subcode: u8, rs: u8, rt: u8 },
+    RType {
+        opcode: u8,
+        rd: u8,
+        rs: u8,
+        rt: u8,
+        funct: u8,
+    },
+    IType {
+        opcode: u8,
+        rt: u8,
+        imm: u8,
+    },
+    JType {
+        opcode: u8,
+        offset: u16,
+    },
+    EType {
+        subcode: u8,
+        rs: u8,
+        rt: u8,
+    },
 }
 
 impl UpperHex for Word {
@@ -78,7 +95,13 @@ impl Word {
                 rs: ((bits & RS_MASK) >> RS_SHIFT) as u8,
                 rt: ((bits & RT_MASK) >> RT_SHIFT) as u8,
             },
-            _ => Self::RType { opcode: 0, rd: 0, rs: 0, rt: 0, funct: 0 }
+            _ => Self::RType {
+                opcode: 0,
+                rd: 0,
+                rs: 0,
+                rt: 0,
+                funct: 0,
+            },
         }
     }
 
@@ -121,18 +144,15 @@ impl Word {
 
     pub fn rs(self) -> Option<u8> {
         match self {
-            Self::RType { rs, .. }
-            | Self::EType { rs, .. } => Some(rs),
+            Self::RType { rs, .. } | Self::EType { rs, .. } => Some(rs),
             _ => None,
         }
     }
 
     pub fn rt(self) -> Option<u8> {
         match self {
-            Self::RType { rt,..}
-            | Self::IType { rt, ..}
-            | Self::EType { rt, ..} => Some(rt),
-            _ => None
+            Self::RType { rt, .. } | Self::IType { rt, .. } | Self::EType { rt, .. } => Some(rt),
+            _ => None,
         }
     }
 
@@ -147,30 +167,33 @@ impl Word {
 impl Word {
     pub fn to_bits(self) -> u16 {
         match self {
-            Self::RType { opcode, rd, rs, rt, funct } => {
-                (opcode as u16) << OPCODE_SHIFT |
-                (rd as u16) << RD_SHIFT |
-                (rs as u16) << RS_SHIFT |
-                (rt as u16) << RT_SHIFT |
-                (funct as u16)
-            },
+            Self::RType {
+                opcode,
+                rd,
+                rs,
+                rt,
+                funct,
+            } => {
+                (opcode as u16) << OPCODE_SHIFT
+                    | (rd as u16) << RD_SHIFT
+                    | (rs as u16) << RS_SHIFT
+                    | (rt as u16) << RT_SHIFT
+                    | (funct as u16)
+            }
 
-            Self::IType { opcode, rt, imm: immediate } => {
-                (opcode as u16) << OPCODE_SHIFT |
-                (rt as u16) << RD_SHIFT |
-                (immediate as u16)
-            },
+            Self::IType {
+                opcode,
+                rt,
+                imm: immediate,
+            } => (opcode as u16) << OPCODE_SHIFT | (rt as u16) << RD_SHIFT | (immediate as u16),
 
-            Self::JType { opcode, offset } => {
-                (opcode as u16) << OPCODE_SHIFT |
-                (offset as u16)
-            },
+            Self::JType { opcode, offset } => (opcode as u16) << OPCODE_SHIFT | (offset as u16),
 
             Self::EType { subcode, rs, rt } => {
-                (0xF << OPCODE_SHIFT) |
-                (subcode as u16) << RD_SHIFT |
-                (rs as u16) << RS_SHIFT |
-                (rt as u16) << RT_SHIFT
+                (0xF << OPCODE_SHIFT)
+                    | (subcode as u16) << RD_SHIFT
+                    | (rs as u16) << RS_SHIFT
+                    | (rt as u16) << RT_SHIFT
             }
         }
     }
@@ -197,25 +220,54 @@ mod tests {
     fn test_new() {
         {
             let w = Word::new(0b0001_101_110_111_010);
-            assert_eq!(w, Word::RType { opcode: 0b0001, rd: 0b0101, rs: 0b0110, rt: 0b0111, funct: 0b0010 });
+            assert_eq!(
+                w,
+                Word::RType {
+                    opcode: 0b0001,
+                    rd: 0b0101,
+                    rs: 0b0110,
+                    rt: 0b0111,
+                    funct: 0b0010
+                }
+            );
         }
 
         {
             let w = Word::new(0b0110_101_011111111);
-            assert_eq!(w, Word::IType { opcode: 0b0110, rt: 0b0101, imm: 0b011111111 });
+            assert_eq!(
+                w,
+                Word::IType {
+                    opcode: 0b0110,
+                    rt: 0b0101,
+                    imm: 0b011111111
+                }
+            );
         }
 
         {
             let w = Word::new(0b1010_1100_1101_1110);
-            assert_eq!(w, Word::JType { opcode: 0xA, offset: 0xCDE });
+            assert_eq!(
+                w,
+                Word::JType {
+                    opcode: 0xA,
+                    offset: 0xCDE
+                }
+            );
         }
 
         {
             let w = Word::new(0b1111_110_010_011_000);
-            assert_eq!(w, Word::EType { subcode: 0b110, rs: 0b010, rt: 0b011 });
+            assert_eq!(
+                w,
+                Word::EType {
+                    subcode: 0b110,
+                    rs: 0b010,
+                    rt: 0b011
+                }
+            );
         }
     }
-    
+
     #[test]
     fn test_to_bits() {
         {
@@ -225,25 +277,42 @@ mod tests {
         }
 
         {
-            let word = Word::RType { opcode: 0x1, rd: 0x5, rs: 0x6, rt: 0x7, funct: 0x2 };
+            let word = Word::RType {
+                opcode: 0x1,
+                rd: 0x5,
+                rs: 0x6,
+                rt: 0x7,
+                funct: 0x2,
+            };
             let bits = word.to_bits();
             assert_eq!(bits, 0b0001_101_110_111_010);
         }
 
         {
-            let word = Word::JType { opcode: 0xA, offset: 0xCDE };
+            let word = Word::JType {
+                opcode: 0xA,
+                offset: 0xCDE,
+            };
             let bits = word.to_bits();
             assert_eq!(bits, 0b1010_1100_1101_1110);
         }
 
         {
-            let word = Word::IType { opcode: 0x6, rt: 0x5, imm: 0xFF };
+            let word = Word::IType {
+                opcode: 0x6,
+                rt: 0x5,
+                imm: 0xFF,
+            };
             let bits = word.to_bits();
             assert_eq!(bits, 0b0110_101_011111111);
         }
 
         {
-            let word = Word::EType { subcode: 0x6, rs: 0x2, rt: 0x3 };
+            let word = Word::EType {
+                subcode: 0x6,
+                rs: 0x2,
+                rt: 0x3,
+            };
             let bits = word.to_bits();
             assert_eq!(bits, 0b1111_110_010_011_000);
         }

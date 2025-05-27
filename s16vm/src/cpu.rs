@@ -1,5 +1,5 @@
-mod instructions;
 mod error;
+mod instructions;
 mod memory;
 mod types;
 
@@ -19,15 +19,15 @@ struct Flags {
 
 impl Flags {
     fn as_u16(&self) -> u16 {
-        (self.zero as u16)     << 0 |
-        (self.carry as u16)    << 1 |
-        (self.negative as u16) << 2 |
-        (self.overflow as u16) << 3
+        (self.zero as u16) << 0
+            | (self.carry as u16) << 1
+            | (self.negative as u16) << 2
+            | (self.overflow as u16) << 3
     }
 
     fn from_u16(&mut self, value: u16) {
-        self.zero     = (value & 0x01) != 0;
-        self.carry    = (value & 0x02) != 0;
+        self.zero = (value & 0x01) != 0;
+        self.carry = (value & 0x02) != 0;
         self.negative = (value & 0x04) != 0;
         self.overflow = (value & 0x08) != 0;
     }
@@ -40,7 +40,7 @@ pub struct CPU {
     flags: Flags,        // CPU Flags (Z, C, N, V)
 
     memory: Memory,
-    
+
     halted: bool,
 
     // used to control program bounderies
@@ -51,20 +51,22 @@ pub struct CPU {
 impl CPU {
     pub fn execute(&mut self, instruction: Instruction) -> Result<()> {
         match instruction {
-            Instruction::Add { rd, rs, rt } => self.op_add(rd,rs,rt),
+            Instruction::Add { rd, rs, rt } => self.op_add(rd, rs, rt),
             Instruction::Sub { rd, rs, rt } => self.op_sub(rd, rs, rt),
-            
+
             Instruction::And { rd, rs, rt } => self.op_logical(rd, rs, rt, LogicalOperation::And),
-            Instruction::Or { rd, rs, rt }  => self.op_logical(rd, rs, rt, LogicalOperation::Or),
+            Instruction::Or { rd, rs, rt } => self.op_logical(rd, rs, rt, LogicalOperation::Or),
             Instruction::Xor { rd, rs, rt } => self.op_logical(rd, rs, rt, LogicalOperation::Xor),
-            Instruction::Not { rd, rt }               => self.op_logical(rd, Register::R0, rt, LogicalOperation::Not),
+            Instruction::Not { rd, rt } => {
+                self.op_logical(rd, Register::R0, rt, LogicalOperation::Not)
+            }
 
             Instruction::Sll { rd, rs, rt } => self.op_shift(rd, rs, rt, ShiftOperation::Left),
             Instruction::Shr { rd, rs, rt } => self.op_shift(rd, rs, rt, ShiftOperation::Right),
 
             Instruction::LoadIndirect { rd, rs } => self.op_load_indirect(rd, rs),
             Instruction::StoreIndirect { rd, rs } => self.op_store_indirect(rd, rs),
-            
+
             Instruction::Push { rs } => self.op_push(rs),
             Instruction::Pop { rd } => self.op_pop(rd),
 
@@ -80,10 +82,10 @@ impl CPU {
 
             Instruction::Load { rt, addr } => self.op_load(rt, addr),
             Instruction::Store { rt, addr } => self.op_store(rt, addr),
-            
+
             Instruction::MoveFromSpecial { rt, spec } => self.op_movs(rt, spec, false),
             Instruction::MoveFromToSpecial { rt, spec } => self.op_movs(rt, spec, true),
-            
+
             Instruction::Nop => Ok(()),
             Instruction::Halt => self.op_halt(),
             Instruction::Sysall => Err(CpuError::NotImplementedYet),
@@ -92,7 +94,7 @@ impl CPU {
 
     pub fn step(&mut self) -> Result<bool> {
         if self.halted {
-            return Ok(false)
+            return Ok(false);
         }
 
         // Security control
@@ -134,7 +136,7 @@ impl CPU {
     }
 
     pub fn run(&mut self) -> Result<()> {
-        while self.step()? {};
+        while self.step()? {}
 
         Ok(())
     }
@@ -145,7 +147,12 @@ impl CPU {
         // Check if we can read full instruction and not became out of program boundaries.
         let instruction_end = self.pc.saturating_add(2);
         if self.pc < self.program_start || instruction_end > self.program_end {
-            Err(CpuError::ProgramBoundsViolation { pc: self.pc, iend: instruction_end, low: self.program_start, high: self.program_end })
+            Err(CpuError::ProgramBoundsViolation {
+                pc: self.pc,
+                iend: instruction_end,
+                low: self.program_start,
+                high: self.program_end,
+            })
         } else {
             Ok(())
         }
@@ -174,7 +181,14 @@ impl CPU {
         }
     }
 
-    fn update_flags_arithmetic(&mut self, operand_a: u16, operand_b: u16, result: u16, carry: bool, is_substraction: bool) {
+    fn update_flags_arithmetic(
+        &mut self,
+        operand_a: u16,
+        operand_b: u16,
+        result: u16,
+        carry: bool,
+        is_substraction: bool,
+    ) {
         self.flags.zero = result == 0;
         self.flags.negative = (result & 0x8000) != 0;
         self.flags.carry = carry;
@@ -195,7 +209,13 @@ impl CPU {
         self.flags.overflow = false;
     }
 
-    fn check_overflow(&self, operand_a: u16, operand_b: u16, result: u16, is_substraction: bool) -> bool {
+    fn check_overflow(
+        &self,
+        operand_a: u16,
+        operand_b: u16,
+        result: u16,
+        is_substraction: bool,
+    ) -> bool {
         let a_sign = (operand_a & 0x8000) != 0;
         let b_sign = (operand_b & 0x8000) != 0;
         let result_sign = (result & 0x8000) != 0;
@@ -204,25 +224,26 @@ impl CPU {
             // overflow happens when:
             // 1. positive - negative = negative
             // 2. negative - positive = positive
-            (!a_sign && b_sign && result_sign) ||
-            (a_sign && !b_sign && !result_sign)
+            (!a_sign && b_sign && result_sign) || (a_sign && !b_sign && !result_sign)
         } else {
             // overflow happens when:
             // 1. negative + negative = positive
             // 2. positive + positive = negative
-            (!a_sign && !b_sign && result_sign) ||
-            (a_sign && b_sign && !result_sign)
+            (!a_sign && !b_sign && result_sign) || (a_sign && b_sign && !result_sign)
         }
     }
-
 }
 
 enum LogicalOperation {
-    And, Or, Xor, Not,
+    And,
+    Or,
+    Xor,
+    Not,
 }
 
 enum ShiftOperation {
-    Left, Right
+    Left,
+    Right,
 }
 
 // Debug methods
@@ -251,11 +272,15 @@ impl CPU {
         let mut output = String::new();
 
         for (i, val) in self.registers.iter().enumerate() {
-            output.push_str(&format!("R{} 0x{:04X} 0b{:016b} ({:5})\n", i, val, val, val));
+            output.push_str(&format!(
+                "R{} 0x{:04X} 0b{:016b} ({:5})\n",
+                i, val, val, val
+            ));
         }
 
-        output.push_str(&format!("FLAGS: 0x{:04X} [Z:{} C:{} N:{} V:{}]\n", 
-            self.flags.as_u16(), 
+        output.push_str(&format!(
+            "FLAGS: 0x{:04X} [Z:{} C:{} N:{} V:{}]\n",
+            self.flags.as_u16(),
             self.flags.zero,
             self.flags.carry,
             self.flags.negative,
@@ -279,7 +304,7 @@ impl CPU {
                 output.push('\n');
             }
         }
-        
+
         output
     }
 }
@@ -308,12 +333,18 @@ impl CPU {
         Ok(())
     }
 
-    fn op_logical(&mut self, rd: Register, rs: Register, rt: Register, op: LogicalOperation) -> Result<()> {
+    fn op_logical(
+        &mut self,
+        rd: Register,
+        rs: Register,
+        rt: Register,
+        op: LogicalOperation,
+    ) -> Result<()> {
         let a = self.get_register(rs);
         let b = self.get_register(rt);
         let result = match op {
             LogicalOperation::And => a & b,
-            LogicalOperation::Or  => a | b,
+            LogicalOperation::Or => a | b,
             LogicalOperation::Xor => a ^ b,
             LogicalOperation::Not => !a,
         };
@@ -324,7 +355,13 @@ impl CPU {
         Ok(())
     }
 
-    fn op_shift(&mut self, rd: Register, rs:Register, rt: Register, op: ShiftOperation) -> Result<()> {
+    fn op_shift(
+        &mut self,
+        rd: Register,
+        rs: Register,
+        rt: Register,
+        op: ShiftOperation,
+    ) -> Result<()> {
         let value = self.get_register(rs);
         let s_size = self.get_register(rt) & 0xF; // Mask to 4 bits (0-15 range)
 
@@ -337,13 +374,13 @@ impl CPU {
             ShiftOperation::Left => {
                 (
                     value << s_size,
-                    ((value >> (16 - s_size)) & 1 == 1) // when shift to the left, a bigger bit falls out
+                    ((value >> (16 - s_size)) & 1 == 1), // when shift to the left, a bigger bit falls out
                 )
             }
             ShiftOperation::Right => {
                 (
                     value >> s_size,
-                    ((value >> (s_size - 1)) & 1 == 1) // when shift to the left, a lower bit falls out
+                    ((value >> (s_size - 1)) & 1 == 1), // when shift to the left, a lower bit falls out
                 )
             }
         };
@@ -384,7 +421,7 @@ impl CPU {
     fn op_push(&mut self, rs: Register) -> Result<()> {
         let value = self.get_register(rs);
         if self.sp < 2 {
-            return Err(CpuError::StackOverflow)
+            return Err(CpuError::StackOverflow);
         }
 
         self.sp = self.sp.wrapping_sub(2);
@@ -395,7 +432,7 @@ impl CPU {
 
     fn op_pop(&mut self, rd: Register) -> Result<()> {
         if self.sp > 0xFFFE {
-            return Err(CpuError::StackOverflow)
+            return Err(CpuError::StackOverflow);
         }
 
         let value = self.memory.read_word(self.sp)?;
@@ -419,25 +456,25 @@ impl CPU {
             Jump::Call => {
                 self.op_push(Register::PC)?;
                 self.set_register(Register::PC, self.pc.wrapping_add_signed(signed_offset));
-            },
+            }
             Jump::Unconditional => {
                 self.set_register(Register::PC, self.pc.wrapping_add_signed(signed_offset));
-            },
+            }
             Jump::Zero => {
                 if self.flags.zero {
                     self.set_register(Register::PC, self.pc.wrapping_add_signed(signed_offset));
                 }
-            },
+            }
             Jump::NotZero => {
                 if !self.flags.zero {
                     self.set_register(Register::PC, self.pc.wrapping_add_signed(signed_offset));
                 }
-            },
+            }
             Jump::GreaterThan => {
                 if !self.flags.zero && self.flags.negative == self.flags.overflow {
                     self.set_register(Register::PC, self.pc.wrapping_add_signed(signed_offset));
                 }
-            },
+            }
         }
 
         Ok(())
@@ -450,7 +487,7 @@ impl CPU {
 
         self.set_register(rt, result);
         self.update_flags_arithmetic(operand_a, operand_b, result, carry, false);
-        
+
         Ok(())
     }
 
@@ -458,10 +495,10 @@ impl CPU {
         let value = self.get_register(rt);
         let imm = imm as u16;
         let result = value & imm;
-        
+
         self.set_register(rt, result);
         self.update_flags_logical(result);
-        
+
         Ok(())
     }
 
@@ -469,10 +506,10 @@ impl CPU {
         let value = self.get_register(rt);
         let imm = imm as u16;
         let result = value & imm;
-        
+
         self.set_register(rt, result);
         self.update_flags_logical(result);
-        
+
         Ok(())
     }
 
@@ -488,7 +525,7 @@ impl CPU {
 
     // imm is used as 8 bits value
     fn op_load_upper_immediate(&mut self, rt: Register, imm: u8) -> Result<()> {
-        let value= (imm as u16) << 8;
+        let value = (imm as u16) << 8;
         self.set_register(rt, value);
 
         Ok(())
