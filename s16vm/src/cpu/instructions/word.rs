@@ -1,6 +1,9 @@
 use std::fmt::UpperHex;
 
 const OPCODE_SHIFT: u8 = 12;
+const SUBCODE_SHIFT: u8 = 8;
+const SUB_RS_SHIFT: u8 = 5;
+const SUB_RT_SHIFT: u8 = 2;
 const RD_SHIFT: u8 = 9;
 const RS_SHIFT: u8 = 6;
 const RT_SHIFT: u8 = 3;
@@ -12,30 +15,36 @@ const RT_MASK: u16 = 0b0000_0000_0011_1000;
 const FUNCT_MASK: u16 = 0b0000_0000_0000_0111;
 const IMMEDIATE_MASK: u16 = 0b0000_0000_1111_1111;
 const OFFSET_MASK: u16 = 0b0000_1111_1111_1111;
+const SUBCODE_MASK: u16 = 0b0000_1111_0000_0000;
+const SUB_RS_MASK: u16 = 0b0000_0000_1110_0000;
+const SUB_RT_MASK: u16 = 0b0000_0000_0001_1100;
 
 // A single word can code 4 different insturction types:
-// **R-Type (Register-Register Operations)**
+//
+// ### R-Type (Register-Register Operations)
 // ```
 // 15 14 13 12 | 11 10 09 | 08 07 06 | 05 04 03 | 02 01 00
 // OPCODE      | RD       | RS       | RT       | FUNCT
 // ```
-
-// **I-Type (Immediate Operations)**
+//
+// ### I-Type (Immediate Operations)
 // ```
-// 15 14 13 12 | 11 10 09 | 08 07 06 05 04 03 02 01 00
-// OPCODE      | RT       | IMMEDIATE (9-bit signed)
+// 15 14 13 12 | 11 10 09 | 08 | 07 06 05 04 03 02 01 00
+// OPCODE      | RT       | 0  | IMMEDIATE
 // ```
-
-// **J-Type (Jump Operations)**
+// - Immediate range: -128 to +127
+//
+// ### J-Type (Jump Operations)
 // ```
 // 15 14 13 12 | 11 10 09 08 07 06 05 04 03 02 01 00
 // OPCODE      | OFFSET (12-bit signed)
 // ```
-
-// **E-Type (Extended Operations)**
+// - Jump range: -2048 to +2047 (relative to PC)
+//
+// ### E-Type (Extended Instructions)
 // ```
-// 15 14 13 12 | 11 10 09 | 08 07 06 | 05 04 03 | 02 01 00
-// 0xF         | SUBCODE  | RS       | RT       | 0x0
+// 15 14 13 12 | 11 10 09 08 | 07 06  05 | 04 03 02 | 01 00
+// 0xF         | SUBCODE     | RS        | RT       | 0x0
 // ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Word {
@@ -91,9 +100,9 @@ impl Word {
                 offset: (bits & OFFSET_MASK) as u16,
             },
             0xF => Self::EType {
-                subcode: ((bits & RD_MASK) >> RD_SHIFT) as u8,
-                rs: ((bits & RS_MASK) >> RS_SHIFT) as u8,
-                rt: ((bits & RT_MASK) >> RT_SHIFT) as u8,
+                subcode: ((bits & SUBCODE_MASK) >> SUBCODE_SHIFT) as u8,
+                rs: ((bits & SUB_RS_MASK) >> SUB_RS_SHIFT) as u8,
+                rt: ((bits & SUB_RT_MASK) >> SUB_RT_SHIFT) as u8,
             },
             _ => Self::RType {
                 opcode: 0,
@@ -191,9 +200,9 @@ impl Word {
 
             Self::EType { subcode, rs, rt } => {
                 (0xF << OPCODE_SHIFT)
-                    | (subcode as u16) << RD_SHIFT
-                    | (rs as u16) << RS_SHIFT
-                    | (rt as u16) << RT_SHIFT
+                    | (subcode as u16) << SUBCODE_SHIFT
+                    | (rs as u16) << SUB_RS_SHIFT
+                    | (rt as u16) << SUB_RT_SHIFT
             }
         }
     }
@@ -256,11 +265,11 @@ mod tests {
         }
 
         {
-            let w = Word::new(0b1111_110_010_011_000);
+            let w = Word::new(0b1111_1100_010_011_00);
             assert_eq!(
                 w,
                 Word::EType {
-                    subcode: 0b110,
+                    subcode: 0b1100,
                     rs: 0b010,
                     rt: 0b011
                 }
@@ -309,12 +318,12 @@ mod tests {
 
         {
             let word = Word::EType {
-                subcode: 0x6,
-                rs: 0x2,
-                rt: 0x3,
+                subcode: 0xF,
+                rs: 0x6,
+                rt: 0x7,
             };
             let bits = word.to_bits();
-            assert_eq!(bits, 0b1111_110_010_011_000);
+            assert_eq!(bits, 0b1111_1111_1101_1100);
         }
     }
 }

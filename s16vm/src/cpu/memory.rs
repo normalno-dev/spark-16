@@ -61,11 +61,12 @@ impl Memory {
 
     pub fn get_range(&self, start: u16, length: u16) -> Vec<u8> {
         let start_idx = start as usize;
-        let end_idx = (start + length) as usize;
+        let end = start as u32 + length as u32;
 
-        if end_idx > self.data.len() {
+        if end > 0xFFFF {
             Vec::new()
         } else {
+            let end_idx = (start + length) as usize;
             self.data[start_idx..end_idx].to_vec()
         }
     }

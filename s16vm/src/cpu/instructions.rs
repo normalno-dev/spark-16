@@ -51,6 +51,41 @@ pub enum Instruction {
 
 type Result<T> = std::result::Result<T, InstructionError>;
 
+impl std::fmt::Display for Instruction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use Instruction::*;
+        match self {
+            Add { rd, rs, rt } => write!(f, "ADD {}, {}, {}", rd, rs, rt),
+            Sub { rd, rs, rt } => write!(f, "SUB {}, {}, {}", rd, rs, rt),
+            And { rd, rs, rt } => write!(f, "AND {}, {}, {}", rd, rs, rt),
+            Or { rd, rs, rt } => write!(f, "OR {}, {}, {}", rd, rs, rt),
+            Xor { rd, rs, rt } => write!(f, "XOR {}, {}, {}", rd, rs, rt),
+            Not { rd, rt } => write!(f, "NOT {}, {}", rd, rt),
+            Sll { rd, rs, rt } => write!(f, "Sll"),
+            Shr { rd, rs, rt } => write!(f, "Shr"),
+            LoadIndirect { rd, rs } => write!(f, "LoadIndirect"),
+            StoreIndirect { rd, rs } => write!(f, "StoreIndirect"),
+            Cmp { rs, rt } => write!(f, "Cmp"),
+            Return => write!(f, "Return"),
+            Push { rs } => write!(f, "Push"),
+            Pop { rd } => write!(f, "Pop"),
+            AddImmediate { rt, imm } => write!(f, "ADDI {}, {}", rt, imm),
+            AndImmediate { rt, imm } => write!(f, "AndImmediate"),
+            OrImmediate { rt, imm } => write!(f, "ORI {}, {}", rt, imm),
+            LoadUperImmediate { rt, imm } => write!(f, "LoadUperImmediate"),
+            CmpImmediate { rt, imm } => write!(f, "CmpImmediate"),
+            Load { rt, addr } => write!(f, "LOAD {}, 0x{:04X}", rt, addr),
+            Store { rt, addr } => write!(f, "STORE {}, 0x{:04X}", rt, addr),
+            Jump { jump_type, offset } => write!(f, "Jump"),
+            MoveFromSpecial { rt, spec } => write!(f, "MoveFromSpecial"),
+            MoveFromToSpecial { rt, spec } => write!(f, "MoveFromToSpecial"),
+            Nop => write!(f, "Nop"),
+            Halt => write!(f, "HALT"),
+            Sysall => write!(f, "Sysall"),
+        }
+    }
+}
+
 impl Instruction {
     pub fn decode(w: Word) -> Result<Instruction> {
         let instrruction = match w {
@@ -88,13 +123,13 @@ impl Instruction {
                 let rt = R::new(rt)?;
 
                 match opcode {
-                    0x0 => Instruction::Load { rt, addr: imm },
-                    0x1 => Instruction::Store { rt, addr: imm },
-                    0x2 => Instruction::AddImmediate { rt, imm: imm as i8 },
-                    0x3 => Instruction::AndImmediate { rt, imm },
-                    0x4 => Instruction::OrImmediate { rt, imm },
-                    0x5 => Instruction::LoadUperImmediate { rt, imm },
-                    0x6 => Instruction::CmpImmediate { rt, imm: imm as i8 },
+                    0x2 => Instruction::Load { rt, addr: imm },
+                    0x3 => Instruction::Store { rt, addr: imm },
+                    0x4 => Instruction::AddImmediate { rt, imm: imm as i8 },
+                    0x5 => Instruction::AndImmediate { rt, imm },
+                    0x6 => Instruction::OrImmediate { rt, imm },
+                    0x7 => Instruction::LoadUperImmediate { rt, imm },
+                    0x8 => Instruction::CmpImmediate { rt, imm: imm as i8 },
                     _ => return Err(InstructionError::InvalidIType(opcode)),
                 }
             }
@@ -102,23 +137,23 @@ impl Instruction {
             Word::JType { opcode, offset } => {
                 use Jump::*;
                 match opcode {
-                    0x7 => Instruction::Jump {
+                    0x9 => Instruction::Jump {
                         jump_type: Call,
                         offset,
                     },
-                    0x8 => Instruction::Jump {
+                    0xA => Instruction::Jump {
                         jump_type: Unconditional,
                         offset,
                     },
-                    0x9 => Instruction::Jump {
+                    0xB => Instruction::Jump {
                         jump_type: Zero,
                         offset,
                     },
-                    0xA => Instruction::Jump {
+                    0xC => Instruction::Jump {
                         jump_type: NotZero,
                         offset,
                     },
-                    0xB => Instruction::Jump {
+                    0xD => Instruction::Jump {
                         jump_type: GreaterThan,
                         offset,
                     },

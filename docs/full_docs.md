@@ -65,8 +65,8 @@ OPCODE      | OFFSET (12-bit signed)
 
 ### E-Type (Extended Instructions)
 ```
-15 14 13 12 | 11 10 09 | 08 07 06 | 05 04 03 | 02 01 00
-0xF         | SUBCODE  | RS       | RT       | 0x0
+15 14 13 12 | 11 10 09 08 | 07 06  05 | 04 03 02 | 01 00
+0xF         | SUBCODE     | RS        | RT       | 0x0
 ```
 
 ## Instruction Set

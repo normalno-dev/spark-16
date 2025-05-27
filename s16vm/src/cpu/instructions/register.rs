@@ -2,7 +2,7 @@ use super::error::InstructionError;
 
 type Result<T> = std::result::Result<T, InstructionError>;
 
-#[derive(Debug,Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum Register {
     R0 = 0,
     R1 = 1,
@@ -16,7 +16,18 @@ pub enum Register {
     // Special Registers
     SP,
     PC,
-    FLAGS
+    FLAGS,
+}
+
+impl std::fmt::Display for Register {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::SP => write!(f, "SP"),
+            Self::PC => write!(f, "PC"),
+            Self::FLAGS => write!(f, "FLAGS"),
+            _ => write!(f, "R{}", self.idx())
+        }
+    }
 }
 
 impl Register {
