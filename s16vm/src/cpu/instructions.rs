@@ -40,16 +40,13 @@ pub enum Instruction {
 
     Jump { jump_type: Jump, offset: u16 },
 
-    MoveFromSpecialToReg { rt: R, spec: R },
-    MoveFromRegToSpecial { rt: R, spec: R },
+    MoveFromSpecial { rt: R, spec: R },
+    MoveFromToSpecial { rt: R, spec: R },
 
     // System operations
     Nop,
     Halt,
     Sysall,
-
-    // Special invalid instruction
-    ERR(String),
 }
 
 type Result<T> = std::result::Result<T, InstructionError>;
@@ -127,7 +124,7 @@ impl Instruction {
                         _ => return Err(InstructionError::InvalidSpecialRegister(rt))
                     };
                     let rt = R::new(rs)?;
-                    Instruction::MoveFromSpecialToReg { rt, spec }
+                    Instruction::MoveFromSpecial { rt, spec }
                 }
                 0x2 => { // MOVS SPEC, Rt ; instruction is [0xF][SUB][Rs][Rt][0]
                     let rt = R::new(rt)?;
@@ -137,7 +134,7 @@ impl Instruction {
                         2 => R::FLAGS,
                         _ => return Err(InstructionError::InvalidSpecialRegister(rs))
                     };
-                    Instruction::MoveFromRegToSpecial { rt, spec }
+                    Instruction::MoveFromToSpecial { rt, spec }
                 }
                 _ => return Err(InstructionError::InvalidEType(subcode)),
             },

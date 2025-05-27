@@ -1,6 +1,7 @@
 mod instructions;
 mod error;
 mod memory;
+mod types;
 
 use error::CpuError;
 use instructions::{register::Register, word::Word, Instruction, Jump};
@@ -63,25 +64,29 @@ impl CPU {
 
             Instruction::LoadIndirect { rd, rs } => self.op_load_indirect(rd, rs),
             Instruction::StoreIndirect { rd, rs } => self.op_store_indirect(rd, rs),
-
-            Instruction::Cmp { rs, rt } => self.op_cmp(rs, rt),
-            Instruction::Return => self.op_ret(),
+            
             Instruction::Push { rs } => self.op_push(rs),
             Instruction::Pop { rd } => self.op_pop(rd),
-            Instruction::AddImmediate { rt, imm } => Err(CpuError::NotImplementedYet),
-            Instruction::AndImmediate { rt, imm } => Err(CpuError::NotImplementedYet),
-            Instruction::OrImmediate { rt, imm } => Err(CpuError::NotImplementedYet),
-            Instruction::LoadUperImmediate { rt, imm } => Err(CpuError::NotImplementedYet),
-            Instruction::CmpImmediate { rt, imm } => Err(CpuError::NotImplementedYet),
-            Instruction::Load { rt, addr } => Err(CpuError::NotImplementedYet),
-            Instruction::Store { rt, addr } => Err(CpuError::NotImplementedYet),
+
+            Instruction::Cmp { rs, rt } => self.op_cmp(rs, rt),
             Instruction::Jump { jump_type, offset } => self.op_jump(jump_type, offset),
-            Instruction::MoveFromSpecialToReg { rt, spec } => Err(CpuError::NotImplementedYet),
-            Instruction::MoveFromRegToSpecial { rt, spec } => Err(CpuError::NotImplementedYet),
+            Instruction::Return => self.op_ret(),
+
+            Instruction::AddImmediate { rt, imm } => self.op_add_immediate(rt, imm),
+            Instruction::AndImmediate { rt, imm } => self.op_and_immediate(rt, imm),
+            Instruction::OrImmediate { rt, imm } => self.op_or_immediate(rt, imm),
+            Instruction::CmpImmediate { rt, imm } => self.op_cmp_immediate(rt, imm),
+            Instruction::LoadUperImmediate { rt, imm } => self.op_load_upper_immediate(rt, imm),
+
+            Instruction::Load { rt, addr } => self.op_load(rt, addr),
+            Instruction::Store { rt, addr } => self.op_store(rt, addr),
+            
+            Instruction::MoveFromSpecial { rt, spec } => self.op_movs(rt, spec, false),
+            Instruction::MoveFromToSpecial { rt, spec } => self.op_movs(rt, spec, true),
+            
             Instruction::Nop => Ok(()),
             Instruction::Halt => self.op_halt(),
             Instruction::Sysall => Err(CpuError::NotImplementedYet),
-            Instruction::ERR(_) => Err(CpuError::NotImplementedYet),
         }
     }
 
@@ -348,7 +353,7 @@ impl CPU {
 
     // Remember offset is 12 bits!
     fn op_jump(&mut self, jt: Jump, offset: u16) -> Result<()> {
-        let signed_offset = convert_12bit_to_signed(offset);
+        let signed_offset = types::convert_12bit_to_signed(offset);
 
         match jt {
             Jump::Call => {
@@ -377,22 +382,81 @@ impl CPU {
 
         Ok(())
     }
-}
 
-fn convert_12bit_to_signed(offset: u16) -> i16 {
-    let offset = offset & 0x0FFF;
+    fn op_add_immediate(&mut self, rt: Register, imm: i8) -> Result<()> {
+        let operand_a = self.get_register(rt);
+        let operand_b = imm as u16;
+        let (result, carry) = operand_a.overflowing_add(operand_b);
 
-    if offset & 0x0800 != 0 { // negative
-        (offset | 0xF000) as i16
-    } else {
-        offset as i16
+        self.set_register(rt, result);
+        self.update_flags_arithmetic(operand_a, operand_b, result, carry, false);
+        
+        Ok(())
     }
-}
 
-#[cfg(test)]
-mod test {
-    #[test]
-    fn test_u16_as_i12() {
-        let v: u16 = 0b0000_1000_0000_000;
+    fn op_and_immediate(&mut self, rt: Register, imm: u8) -> Result<()> {
+        let value = self.get_register(rt);
+        let imm = imm as u16;
+        let result = value & imm;
+        
+        self.set_register(rt, result);
+        self.update_flags_logical(result);
+        
+        Ok(())
+    }
+
+    fn op_or_immediate(&mut self, rt: Register, imm: u8) -> Result<()> {
+        let value = self.get_register(rt);
+        let imm = imm as u16;
+        let result = value & imm;
+        
+        self.set_register(rt, result);
+        self.update_flags_logical(result);
+        
+        Ok(())
+    }
+
+    fn op_cmp_immediate(&mut self, rt: Register, imm: i8) -> Result<()> {
+        let operand_a = self.get_register(rt);
+        let operand_b = imm as u16;
+        let (result, borrow) = operand_a.overflowing_sub(operand_b);
+
+        self.update_flags_arithmetic(operand_a, operand_b, result, borrow, true);
+
+        Ok(())
+    }
+
+    // imm is used as 8 bits value
+    fn op_load_upper_immediate(&mut self, rt: Register, imm: u8) -> Result<()> {
+        let value= (imm as u16) << 8;
+        self.set_register(rt, value);
+
+        Ok(())
+    }
+
+    fn op_load(&mut self, rt: Register, addr: u8) -> Result<()> {
+        let value = self.memory.read_word(addr as u16)?;
+        self.set_register(rt, value);
+
+        Ok(())
+    }
+
+    fn op_store(&mut self, rt: Register, addr: u8) -> Result<()> {
+        let value = self.get_register(rt);
+        self.memory.write_word(addr as u16, value)?;
+
+        Ok(())
+    }
+
+    fn op_movs(&mut self, rt: Register, spec: Register, to_special: bool) -> Result<()> {
+        let (source, target) = match to_special {
+            true => (rt, spec),
+            false => (spec, rt),
+        };
+
+        let value = self.get_register(source);
+        self.set_register(target, value);
+
+        Ok(())
     }
 }
