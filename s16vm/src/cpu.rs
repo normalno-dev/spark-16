@@ -225,6 +225,66 @@ enum ShiftOperation {
     Left, Right
 }
 
+// Debug methods
+impl CPU {
+    pub fn get_registers(&self) -> &[u16] {
+        &self.registers
+    }
+
+    pub fn get_pc(&self) -> u16 {
+        self.pc
+    }
+
+    pub fn get_sp(&self) -> u16 {
+        self.sp
+    }
+
+    pub fn get_flags(&self) -> &Flags {
+        &self.flags
+    }
+
+    pub fn get_memory(&self) -> &Memory {
+        &self.memory
+    }
+
+    pub fn dump_registers(&self) -> String {
+        let mut output = String::new();
+
+        for (i, val) in self.registers.iter().enumerate() {
+            output.push_str(&format!("R{} 0x{:04X} 0b{:016b} ({:5})\n", i, val, val, val));
+        }
+
+        output.push_str(&format!("FLAGS: 0x{:04X} [Z:{} C:{} N:{} V:{}]\n", 
+            self.flags.as_u16(), 
+            self.flags.zero,
+            self.flags.carry,
+            self.flags.negative,
+            self.flags.overflow,
+        ));
+
+        output
+    }
+
+    pub fn dump_memory_hex(&self, start: u16, length: u16) -> String {
+        let mut output = String::new();
+        let data = self.memory.get_range(start, length);
+
+        for (i, byte) in data.iter().enumerate() {
+            if i % 16 == 0 {
+                output.push_str(&format!("0x{:04X}: ", start + i as u16));
+            }
+
+            output.push_str(&format!("0x{:2X} ", byte));
+            if i % 16 == 15 {
+                output.push('\n');
+            }
+        }
+        
+        output
+    }
+}
+
+// Instruction implementations
 impl CPU {
     fn op_add(&mut self, rd: Register, rs: Register, rt: Register) -> Result<()> {
         let a = self.get_register(rs);

@@ -58,6 +58,17 @@ impl Memory {
         self.data[addr] = byte;
         Ok(())
     }
+
+    pub fn get_range(&self, start: u16, length: u16) -> Vec<u8> {
+        let start_idx = start as usize;
+        let end_idx = (start + length) as usize;
+
+        if end_idx > self.data.len() {
+            Vec::new()
+        } else {
+            self.data[start_idx..end_idx].to_vec()
+        }
+    }
 }
 
 #[cfg(test)]
